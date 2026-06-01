@@ -1,22 +1,38 @@
 import { useState, useEffect } from "react";
-import { PlusCircle, Trash2, ImageIcon, PawPrint } from "lucide-react";
+import { PlusCircle, Trash2, ImageIcon, PawPrint, User, Save } from "lucide-react";
 import PageShell from "../components/PageShell";
+import CitySelect from "../components/CitySelect";
+import { API_BASE } from "../config/api";
+import { getUser, saveUser, isAdmin } from "../utils/auth";
+import { HOME_TIME_OPTIONS, ACTIVITY_OPTIONS, ENERGY_LABELS } from "../data/turkishCities";
 
 function Profile() {
+  const storedUser = getUser();
+  const userIsAdmin = isAdmin(storedUser);
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [lifestyle, setLifestyle] = useState({
+    city: storedUser?.city || "İstanbul",
+    homeTimeLevel: storedUser?.homeTimeLevel ?? 2,
+    hasGarden: storedUser?.hasGarden ?? false,
+    activityLevel: storedUser?.activityLevel ?? 2,
+  });
   const [formData, setFormData] = useState({
     name: "",
     type: "",
     age: "",
     description: "",
     imageUrl: "",
+    city: storedUser?.city || "İstanbul",
+    energyLevel: 2,
+    needsGarden: false,
   });
 
   const fetchPets = async () => {
     try {
-      const response = await fetch("http://localhost:5081/api/pets");
+      const response = await fetch(`${API_BASE}/pets`);
       if (response.ok) {
         setPets(await response.json());
       }
@@ -29,17 +45,81 @@ function Profile() {
 
   useEffect(() => {
     fetchPets();
+    if (!storedUser?.email) return;
+
+    const loadProfile = async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/users/profile?email=${encodeURIComponent(storedUser.email)}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setLifestyle({
+            city: data.city,
+            homeTimeLevel: data.homeTimeLevel,
+            hasGarden: data.hasGarden,
+            activityLevel: data.activityLevel,
+          });
+          setFormData((prev) => ({ ...prev, city: data.city }));
+          saveUser({ ...storedUser, ...data });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    loadProfile();
   }, []);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === "checkbox" ? checked : name === "energyLevel" ? Number(value) : value,
+    });
+  };
+
+  const handleLifestyleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setLifestyle({
+      ...lifestyle,
+      [name]: type === "checkbox" ? checked : type === "radio" ? Number(value) : value,
+    });
+  };
+
+  const saveLifestyle = async (e) => {
+    e.preventDefault();
+    if (!storedUser?.email) {
+      alert("Yaşam tarzı kaydı için giriş yapmalısınız.");
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      const res = await fetch(
+        `${API_BASE}/users/profile?email=${encodeURIComponent(storedUser.email)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(lifestyle),
+        }
+      );
+      if (res.ok) {
+        saveUser({ ...storedUser, ...lifestyle });
+        alert("Yaşam tarzı profiliniz güncellendi. Öneriler buna göre yenilenecek.");
+      } else {
+        alert("Profil güncellenemedi.");
+      }
+    } catch {
+      alert("Bağlantı hatası.");
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const response = await fetch("http://localhost:5081/api/pets", {
+      const response = await fetch(`${API_BASE}/pets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -48,11 +128,23 @@ function Profile() {
           age: parseInt(formData.age, 10),
           description: formData.description,
           imageUrl: formData.imageUrl,
+          city: formData.city,
+          energyLevel: formData.energyLevel,
+          needsGarden: formData.needsGarden,
         }),
       });
 
       if (response.ok) {
-        setFormData({ name: "", type: "", age: "", description: "", imageUrl: "" });
+        setFormData({
+          name: "",
+          type: "",
+          age: "",
+          description: "",
+          imageUrl: "",
+          city: lifestyle.city,
+          energyLevel: 2,
+          needsGarden: false,
+        });
         fetchPets();
       } else {
         alert("İlan eklenirken bir hata oluştu.");
@@ -65,14 +157,22 @@ function Profile() {
   };
 
   const handleDelete = async (id) => {
+    if (!userIsAdmin) {
+      alert("İlan silme yetkisi yalnızca yöneticilerde.");
+      return;
+    }
     if (!window.confirm("Bu ilanı kaldırmak istediğinize emin misiniz?")) return;
 
     try {
-      const response = await fetch(`http://localhost:5081/api/pets/${id}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `${API_BASE}/pets/${id}?email=${encodeURIComponent(storedUser.email)}`,
+        { method: "DELETE" }
+      );
       if (response.ok) fetchPets();
-      else alert("İlan kaldırılırken bir hata oluştu.");
+      else {
+        const data = await response.json().catch(() => ({}));
+        alert(data.message || "İlan kaldırılırken bir hata oluştu.");
+      }
     } catch (error) {
       console.error("Silme hatası:", error);
     }
@@ -86,8 +186,95 @@ function Profile() {
             Profilim
           </h1>
           <p className="mt-2 text-muted">
-            Yeni ilan yayınla veya mevcut ilanlarını yönet.
+            Yaşam tarzı bilgilerinizi güncelleyin, yeni ilan yayınlayın.
           </p>
+        </div>
+
+        <div className="mb-10 rounded-2xl border border-brand-100 bg-white p-6 shadow-soft">
+          <h2 className="mb-4 flex items-center gap-2 font-display text-xl font-bold text-ink">
+            <User size={22} className="text-brand-600" />
+            Yaşam tarzı profili
+          </h2>
+          <p className="mb-6 text-sm text-muted">
+            Bu bilgiler &quot;Senin İçin En Uygun Dostlar&quot; önerilerinde kullanılır.
+          </p>
+          <form onSubmit={saveLifestyle} className="grid gap-6 lg:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                Şehir
+              </label>
+              <CitySelect
+                value={lifestyle.city}
+                onChange={handleLifestyleChange}
+                name="city"
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">
+                Evde geçirilen süre
+              </label>
+              <div className="space-y-2">
+                {HOME_TIME_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex cursor-pointer items-start gap-2 rounded-lg border p-2.5 text-sm ${
+                      lifestyle.homeTimeLevel === opt.value
+                        ? "border-brand-400 bg-brand-50"
+                        : "border-brand-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="homeTimeLevel"
+                      value={opt.value}
+                      checked={lifestyle.homeTimeLevel === opt.value}
+                      onChange={handleLifestyleChange}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-sm lg:col-span-2">
+              <input
+                type="checkbox"
+                name="hasGarden"
+                checked={lifestyle.hasGarden}
+                onChange={handleLifestyleChange}
+              />
+              Evimde bahçe veya geniş açık alan var
+            </label>
+            <div className="lg:col-span-2">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">
+                Aktivite seviyesi
+              </label>
+              <div className="space-y-2">
+                {ACTIVITY_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex cursor-pointer items-start gap-2 rounded-lg border p-2.5 text-sm ${
+                      lifestyle.activityLevel === opt.value
+                        ? "border-brand-400 bg-brand-50"
+                        : "border-brand-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="activityLevel"
+                      value={opt.value}
+                      checked={lifestyle.activityLevel === opt.value}
+                      onChange={handleLifestyleChange}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <button type="submit" disabled={profileSaving} className="btn-primary lg:col-span-2">
+              <Save size={18} />
+              {profileSaving ? "Kaydediliyor…" : "Profili Kaydet"}
+            </button>
+          </form>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
@@ -140,6 +327,38 @@ function Profile() {
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                  Şehir
+                </label>
+                <CitySelect value={formData.city} onChange={handleChange} name="city" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                  Enerji seviyesi
+                </label>
+                <select
+                  name="energyLevel"
+                  value={formData.energyLevel}
+                  onChange={handleChange}
+                  className="input-field"
+                >
+                  {[1, 2, 3].map((n) => (
+                    <option key={n} value={n}>
+                      {ENERGY_LABELS[n]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="needsGarden"
+                  checked={formData.needsGarden}
+                  onChange={handleChange}
+                />
+                Bahçe / geniş alan gerektirir
+              </label>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
                   Fotoğraf URL
                 </label>
                 <div className="relative">
@@ -179,8 +398,13 @@ function Profile() {
 
           <div className="lg:col-span-2">
             <h2 className="mb-6 font-display text-xl font-bold text-ink">
-              Yayınladığım ilanlar ({pets.length})
+              Tüm ilanlar ({pets.length})
             </h2>
+            {userIsAdmin && (
+              <p className="mb-4 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-800">
+                Yönetici olarak ilanları kaldırabilirsiniz.
+              </p>
+            )}
 
             {loading ? (
               <div className="space-y-4">
@@ -192,9 +416,6 @@ function Profile() {
               <div className="rounded-2xl border border-dashed border-brand-200 bg-white py-16 text-center">
                 <PawPrint size={40} className="mx-auto mb-3 text-brand-300" />
                 <p className="font-medium text-ink">Henüz ilan yok</p>
-                <p className="mt-1 text-sm text-muted">
-                  Soldaki formdan ilk ilanını oluştur.
-                </p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -216,22 +437,27 @@ function Profile() {
                         <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-semibold uppercase text-brand-800">
                           {pet.type}
                         </span>
+                        {pet.city && (
+                          <span className="text-xs text-muted">{pet.city}</span>
+                        )}
                       </div>
                       <p className="mt-1 text-sm text-muted line-clamp-2">
                         {pet.description}
                       </p>
                       <span className="mt-2 inline-block text-xs font-medium text-brand-600">
-                        Aktif yayında
+                        {ENERGY_LABELS[pet.energyLevel] || "Orta"} · Aktif
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(pet.id)}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
-                    >
-                      <Trash2 size={14} />
-                      Kaldır
-                    </button>
+                    {userIsAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(pet.id)}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                      >
+                        <Trash2 size={14} />
+                        Kaldır
+                      </button>
+                    )}
                   </article>
                 ))}
               </div>

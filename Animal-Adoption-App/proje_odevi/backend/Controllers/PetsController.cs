@@ -16,11 +16,16 @@ namespace backend.Controllers
             _context = context;
         }
 
-        // 1. Tüm ilanları listeleme (GET: api/pets)
+        // 1. Tüm ilanları listeleme (GET: api/pets?city=İstanbul)
         [HttpGet]
-        public async Task<IActionResult> GetPets()
+        public async Task<IActionResult> GetPets([FromQuery] string? city)
         {
-            var pets = await _context.Pets.ToListAsync();
+            var query = _context.Pets.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(city) && city != "Tümü")
+            {
+                query = query.Where(p => p.City == city);
+            }
+            var pets = await query.ToListAsync();
             return Ok(pets);
         }
 
@@ -49,12 +54,23 @@ namespace backend.Controllers
             return Ok(pet);
         }
 
-        // 4. İlanı silme (DELETE: api/pets/{id})
+        // 4. İlanı silme — yalnızca admin (DELETE: api/pets/{id}?email=admin@...)
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeletePet(string id)
+        public async Task<IActionResult> DeletePet(string id, [FromQuery] string email)
         {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return BadRequest(new { message = "E-posta adresi gerekli." });
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (user == null || !user.IsAdmin)
+            {
+                return StatusCode(403, new { message = "İlan silme yetkisi yalnızca yöneticilerde." });
+            }
+
             var pet = await _context.Pets.FirstOrDefaultAsync(p => p.Id.ToString() == id);
-            
+
             if (pet == null)
             {
                 return NotFound(new { message = "İlan bulunamadı!" });

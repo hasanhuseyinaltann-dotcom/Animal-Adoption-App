@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { LayoutGrid, UserCircle, LogOut } from "lucide-react";
 import Logo from "./Logo";
+import { clearUser, getUser, isAdmin } from "../utils/auth";
 
 const navLinks = [
   { to: "/dashboard", label: "İlanlar", icon: LayoutGrid },
@@ -10,6 +11,8 @@ const navLinks = [
 function Navbar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const user = getUser();
+  const userIsAdmin = isAdmin(user);
 
   return (
     <header className="sticky top-0 z-50 border-b border-brand-100/80 bg-white/85 backdrop-blur-md">
@@ -36,9 +39,18 @@ function Navbar() {
           })}
         </nav>
 
+        {userIsAdmin && (
+          <span className="hidden rounded-full bg-brand-100 px-2.5 py-1 text-xs font-bold text-brand-800 sm:inline">
+            Yönetici
+          </span>
+        )}
+
         <button
           type="button"
-          onClick={() => navigate("/")}
+          onClick={() => {
+            clearUser();
+            navigate("/");
+          }}
           className="inline-flex items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 sm:text-sm"
         >
           <LogOut size={15} />

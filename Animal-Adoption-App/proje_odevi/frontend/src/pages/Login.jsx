@@ -3,6 +3,9 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 import AuthShell from "../components/AuthShell";
+import AuthInput from "../components/AuthInput";
+import { API_BASE } from "../config/api";
+import { saveUser } from "../utils/auth";
 
 function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -17,7 +20,8 @@ function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.post("http://localhost:5081/api/auth/login", form);
+      const { data } = await axios.post(`${API_BASE}/auth/login`, form);
+      if (data.user) saveUser(data.user);
       navigate("/dashboard");
     } catch {
       alert("E-posta veya şifre hatalı");
@@ -47,40 +51,32 @@ function Login() {
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
             E-posta
           </label>
-          <div className="relative">
-            <Mail
-              size={18}
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted/50"
-            />
-            <input
-              type="email"
-              name="email"
-              required
-              placeholder="ornek@mail.com"
-              onChange={handleChange}
-              className="input-field pl-11"
-            />
-          </div>
+          <AuthInput
+            icon={Mail}
+            type="email"
+            name="email"
+            required
+            value={form.email}
+            placeholder="ornek@mail.com"
+            onChange={handleChange}
+            autoComplete="email"
+          />
         </div>
 
         <div>
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
             Şifre
           </label>
-          <div className="relative">
-            <Lock
-              size={18}
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted/50"
-            />
-            <input
-              type="password"
-              name="password"
-              required
-              placeholder="••••••••"
-              onChange={handleChange}
-              className="input-field pl-11"
-            />
-          </div>
+          <AuthInput
+            icon={Lock}
+            type="password"
+            name="password"
+            required
+            value={form.password}
+            placeholder="••••••••"
+            onChange={handleChange}
+            autoComplete="current-password"
+          />
         </div>
 
         <button type="submit" disabled={loading} className="btn-primary w-full">

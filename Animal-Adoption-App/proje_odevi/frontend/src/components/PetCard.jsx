@@ -1,11 +1,16 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Calendar } from "lucide-react";
+import { ArrowRight, Calendar, MapPin } from "lucide-react";
+import { ENERGY_LABELS } from "../data/turkishCities";
 
-function PetCard({ pet }) {
+function PetCard({ pet, highlighted = false }) {
   const navigate = useNavigate();
 
   return (
-    <article className="card-hover group flex flex-col overflow-hidden rounded-2xl border border-brand-100/80 bg-white shadow-soft">
+    <article
+      className={`card-hover group flex flex-col overflow-hidden rounded-2xl border bg-white shadow-soft ${
+        highlighted ? "border-brand-300 ring-2 ring-brand-200/50" : "border-brand-100/80"
+      }`}
+    >
       <div className="relative aspect-[4/3] overflow-hidden bg-brand-50">
         <img
           src={pet.imageUrl || "https://placehold.co/600x450/e8f5e9/166534?text=PatiBul"}
@@ -25,10 +30,22 @@ function PetCard({ pet }) {
           </h3>
         </div>
 
-        <p className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted">
+        <p className="mb-1 inline-flex items-center gap-1.5 text-sm text-muted">
           <Calendar size={14} className="text-brand-500" />
           {pet.age} yaşında
+          {pet.energyLevel && (
+            <span className="text-brand-600">
+              · {ENERGY_LABELS[pet.energyLevel] || "Orta"}
+            </span>
+          )}
         </p>
+        {pet.city && (
+          <p className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted">
+            <MapPin size={14} className="text-brand-500" />
+            {pet.city}
+          </p>
+        )}
+        {!pet.city && <div className="mb-3" />}
 
         <p className="mb-5 flex-1 text-sm leading-relaxed text-muted line-clamp-3">
           {pet.description}

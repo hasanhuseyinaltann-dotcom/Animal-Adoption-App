@@ -7,8 +7,13 @@ import {
   MessageCircle,
   Loader2,
   Tag,
+  MapPin,
+  Zap,
+  TreePine,
 } from "lucide-react";
 import PageShell from "../components/PageShell";
+import { API_BASE } from "../config/api";
+import { ENERGY_LABELS } from "../data/turkishCities";
 
 function PetDetail() {
   const { id } = useParams();
@@ -19,7 +24,7 @@ function PetDetail() {
   useEffect(() => {
     const fetchPetDetail = async () => {
       try {
-        const response = await fetch(`http://localhost:5081/api/pets/${id}`);
+        const response = await fetch(`${API_BASE}/pets/${id}`);
         if (response.ok) {
           setPet(await response.json());
         } else {
@@ -85,6 +90,27 @@ function PetDetail() {
                   <strong className="text-ink">{pet.age}</strong> yaşında
                 </span>
               </p>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                {pet.city && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-800">
+                    <MapPin size={14} />
+                    {pet.city}
+                  </span>
+                )}
+                {pet.energyLevel && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-warm-50 px-3 py-1 text-sm font-medium text-warm-800">
+                    <Zap size={14} />
+                    {ENERGY_LABELS[pet.energyLevel] || "Orta"} enerji
+                  </span>
+                )}
+                {pet.needsGarden && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-sm font-medium text-green-800">
+                    <TreePine size={14} />
+                    Bahçe önerilir
+                  </span>
+                )}
+              </div>
 
               <div className="mt-8 flex-1">
                 <h2 className="text-xs font-bold uppercase tracking-widest text-muted">
