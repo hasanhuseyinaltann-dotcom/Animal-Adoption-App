@@ -36,10 +36,13 @@ function Register() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm({
-      ...form,
-      [name]: type === "checkbox" ? checked : type === "number" ? Number(value) : value,
-    });
+    let nextValue = value;
+    if (type === "checkbox") {
+      nextValue = checked;
+    } else if (type === "number" || type === "radio") {
+      nextValue = Number(value);
+    }
+    setForm({ ...form, [name]: nextValue });
   };
 
   const handleSubmit = async (e) => {
@@ -64,7 +67,11 @@ function Register() {
       alert("Kayıt başarılı! Kişisel önerileriniz hazır.");
       navigate("/dashboard");
     } catch (err) {
-      const msg = err.response?.data?.message || "Kayıt sırasında bir hata oluştu.";
+      const msg =
+        err.response?.data?.message ||
+        (err.code === "ERR_NETWORK"
+          ? "Sunucuya bağlanılamadı. Backend'in çalıştığından emin olun (http://localhost:5081)."
+          : "Kayıt sırasında bir hata oluştu.");
       alert(msg);
     } finally {
       setLoading(false);

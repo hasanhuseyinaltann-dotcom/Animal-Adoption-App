@@ -1,0 +1,27 @@
+name: PatiBul Backend CI
+
+# Hangi durumlarda çalışsın?
+on:
+  push:
+    branches: [ "main", "development" ] # main veya development branch'ine kod pushlandığında
+  pull_request:
+    branches: [ "main" ] # main branch'ine PR açıldığında
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # İşlemin yapılacağı sanal işletim sistemi
+
+    steps:
+    - name: Kodu GitHub'dan Çek
+      uses: actions/checkout@v4
+
+    - name: .NET SDK Kurulumu
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x' # Projenin .NET 9 sürümü
+
+    - name: Bağımlılıkları Yükle (Restore)
+      run: dotnet restore proje_odevi/backend/backend.csproj
+
+    - name: Projeyi Derle (Build)
+      run: dotnet build proje_odevi/backend/backend.csproj --no-restore --configuration Release
